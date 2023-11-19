@@ -336,9 +336,6 @@ type arrayOrMapResult struct {
 func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 	var json = t.Raw
 	var i int
-	var value Result
-	var count int
-	var key Result
 	if vc == 0 {
 		for ; i < len(json); i++ {
 			if json[i] == '{' || json[i] == '[' {
@@ -362,6 +359,7 @@ func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 		}
 		r.vc = vc
 	}
+
 	if r.vc == '{' {
 		if valueize {
 			r.oi = make(map[string]interface{})
@@ -375,6 +373,26 @@ func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 			r.a = make([]Result, 0)
 		}
 	}
+
+	t.parseArrayMapValues(i, json, valueize, Result{}, &r)
+end:
+	if t.Indexes != nil {
+		if len(t.Indexes) != len(r.a) {
+			for i := 0; i < len(r.a); i++ {
+				r.a[i].Index = 0
+			}
+		} else {
+			for i := 0; i < len(r.a); i++ {
+				r.a[i].Index = t.Indexes[i]
+			}
+		}
+	}
+	return
+}
+
+func (t Result) parseArrayMapValues(i int, json string, valueize bool, value Result, r *arrayOrMapResult) {
+	var key Result
+	var count int
 	for ; i < len(json); i++ {
 		if json[i] <= ' ' {
 			continue
@@ -436,22 +454,15 @@ func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 			if valueize {
 				r.ai = append(r.ai, value.Value())
 			} else {
-				r.a = append(r.a, value)
+				if value.IsArray() {
+					r.a = append(r.a, value.Array()...)
+				} else {
+					r.a = append(r.a, value)
+				}
 			}
 		}
 	}
-end:
-	if t.Indexes != nil {
-		if len(t.Indexes) != len(r.a) {
-			for i := 0; i < len(r.a); i++ {
-				r.a[i].Index = 0
-			}
-		} else {
-			for i := 0; i < len(r.a); i++ {
-				r.a[i].Index = t.Indexes[i]
-			}
-		}
-	}
+
 	return
 }
 
@@ -1645,7 +1656,13 @@ func parseArray(c *parseContext, i int, path string) (int, bool) {
 											raw = res.String()
 										}
 										jsons = append(jsons, []byte(raw)...)
-										indexes = append(indexes, res.Index)
+
+										if res.Index != 0 {
+											indexes = append(indexes, res.Index)
+										} else if len(res.Indexes) > 0 {
+											indexes = append(indexes, res.Indexes...)
+										}
+
 										k++
 									}
 								}

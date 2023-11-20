@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -815,6 +816,152 @@ func TestSingleArrayValue(t *testing.T) {
 		t.Fatalf("got '%v', expected '%v'", len(array), 0)
 	}
 
+}
+
+func TestNestedArray(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonPath string
+		body     string
+		res      []Result
+	}{
+		{
+			name:     "nested_array_simple_field",
+			jsonPath: "#.nestedArray.#.nestedArray.#.nestedArray.#.nestedArray.#.desc",
+			body:     `[{"name":"object1","value":1,"nestedArray":[{"id":"one","nestedArray":[{"name":"nested1","desc":"nested 1","nestedArray":[{"name":"nested 2","desc":"nested 2","nestedArray":[{"name":"nested 3","desc":"nested 3"},{"name":"nested 4","desc":"nested 4"}]},{"name":"nested 5","desc":"nested 5"}]},{"name":"nested 6","desc":"nested 6","nestedArray":[{"name":"nested 7","desc":"nested 7","nestedArray":[{"name":"nested 8","desc":"nested 8"},{"name":"nested 9","desc":"nested 9"},{"name":"nested 10"}]},{"name":"nested 11","desc":"nested 11","nestedArray":[{"name":"nested 12","desc":"nested 12","nestedArray":[{"name":"nested 11111111","desc":"nested 11111"}]}]},{"name":"nested 12","desc":"nested 12"}]}]},{"id":"two","nestedArray":[{"name":"nested 13","desc":"nested 13","nestedArray":[{"name":"nested 14","desc":"nested 14"},{"name":"nested 15","desc":"nested 15"}]},{"name":"nested 16","desc":"nested 16"}]}]},{"name":"object2","value":2,"nestedArray":[{"id":"one","nestedArray":[{"name":"nested 17","desc":"nested 17","nestedArray":[{"name":"nested 18","desc":"nested 18","nestedArray":[{"name":"nested 19","desc":"nested 19"},{"name":"nested 20","desc":"nested 20"}]},{"name":"nested 21","desc":"nested 21"}]},{"name":"nested 22","desc":"nested 22","nestedArray":[{"name":"nested 23","desc":"nested 23"},{"name":"nested 24","desc":"nested 24"},{"name":"nested 25","desc":"nested 25","nestedArray":[{"name":"nested 26","desc":"nested 26"},{"name":"nested 27","desc":"nested 27"}]}]}]},{"id":"two","nestedArray":[{"name":"nested 28","desc":"nested 28","nestedArray":[{"name":"nested 29","desc":"nested 29"},{"name":"nested 30","desc":"nested 30","nestedArray":[{"name":"nested 31","desc":"nested 31","nestedArray":[{"name":"nested 32","desc":"nested 32"},{"name":"nested 33","desc":"nested 33"}]},{"name":"nested 34","desc":"nested 34"}]}]},{"name":"nested22","desc":"nested 22"}]}]}]`,
+			res: []Result{
+				{
+					Type:  String,
+					Raw:   `"nested 3"`,
+					Str:   "nested 3",
+					Index: 200,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 4"`,
+					Str:   "nested 4",
+					Index: 238,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 8"`,
+					Str:   "nested 8",
+					Index: 422,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 9"`,
+					Str:   "nested 9",
+					Index: 460,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 12"`,
+					Str:   "nested 12",
+					Index: 576,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 19"`,
+					Str:   "nested 19",
+					Index: 1112,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 20"`,
+					Str:   "nested 20",
+					Index: 1152,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 26"`,
+					Str:   "nested 26",
+					Index: 1424,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 27"`,
+					Str:   "nested 27",
+					Index: 1464,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 31"`,
+					Str:   "nested 31",
+					Index: 1685,
+				},
+				{
+					Type:  String,
+					Raw:   `"nested 34"`,
+					Str:   "nested 34",
+					Index: 1821,
+				},
+			},
+		},
+		{
+			name:     "nested_object_simple_field",
+			jsonPath: "nested.nested.nested.name",
+			body:     `{"name":"one","value":2,"nested":{"name":"two","value":2,"nested":{"name":"three","value":3,"nested":{"name":"four","value":4,"nested":{"name":"five","value":5}}}}}`,
+			res: []Result{
+				{
+					Type:  String,
+					Raw:   `"four"`,
+					Str:   "four",
+					Index: 109,
+				},
+			},
+		},
+		{
+			name:     "object_nested_array_values",
+			jsonPath: "nested.nested.nested.value",
+			body:     `{"name":"one","value":2,"nested":{"name":"two","value":2,"nested":{"name":"three","value":3,"nested":{"name":"four","value":[1,3,5,7],"nested":{"name":"five","value":5}}}}}`,
+			res: []Result{
+				{
+					Type:  Number,
+					Raw:   "1",
+					Str:   "",
+					Num:   1,
+					Index: 125,
+				},
+				{
+					Type:  Number,
+					Raw:   "3",
+					Str:   "",
+					Num:   3,
+					Index: 127,
+				},
+				{
+					Type:  Number,
+					Raw:   "5",
+					Str:   "",
+					Num:   5,
+					Index: 129,
+				},
+				{
+					Type:  Number,
+					Raw:   "7",
+					Str:   "",
+					Num:   7,
+					Index: 131,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := Get(test.body, test.jsonPath)
+
+			got := result.Array()
+
+			for i, expected := range test.res {
+				g := got[i]
+				if !reflect.DeepEqual(expected, g) {
+					t.Fatalf("expected %v, got - %v", expected, g)
+				}
+			}
+		})
+	}
 }
 
 var manyJSON = `  {

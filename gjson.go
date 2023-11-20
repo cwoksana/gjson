@@ -200,7 +200,45 @@ func (t Result) Array() []Result {
 		return []Result{t}
 	}
 	r := t.arrayOrMap('[', false)
+
+	if len(r.a) != len(t.Indexes) && len(t.Indexes) != 0 {
+		var all []Result
+
+		all = parseNestedArray(r.a, t.Indexes)
+		if len(all) == len(t.Indexes) {
+			for i := range t.Indexes {
+				all[i].Index = t.Indexes[i]
+			}
+
+			return all
+		}
+	}
+
 	return r.a
+}
+
+func parseNestedArray(results []Result, indexes []int) (all []Result) {
+	if len(results) != len(indexes) {
+		var nested []Result
+
+		for _, res := range results {
+			if !res.IsArray() {
+				all = append(all, res)
+				continue
+			}
+
+			parsed := res.arrayOrMap('[', false)
+			nested = append(nested, parsed.a...)
+		}
+
+		if len(nested) != len(indexes) {
+			return parseNestedArray(nested, indexes)
+		}
+
+		all = append(all, nested...)
+	}
+
+	return all
 }
 
 // IsObject returns true if the result value is a JSON object.
@@ -336,6 +374,9 @@ type arrayOrMapResult struct {
 func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 	var json = t.Raw
 	var i int
+	var value Result
+	var count int
+	var key Result
 	if vc == 0 {
 		for ; i < len(json); i++ {
 			if json[i] == '{' || json[i] == '[' {
@@ -359,7 +400,6 @@ func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 		}
 		r.vc = vc
 	}
-
 	if r.vc == '{' {
 		if valueize {
 			r.oi = make(map[string]interface{})
@@ -373,26 +413,6 @@ func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 			r.a = make([]Result, 0)
 		}
 	}
-
-	t.parseArrayMapValues(i, json, valueize, Result{}, &r)
-end:
-	if t.Indexes != nil {
-		if len(t.Indexes) != len(r.a) {
-			for i := 0; i < len(r.a); i++ {
-				r.a[i].Index = 0
-			}
-		} else {
-			for i := 0; i < len(r.a); i++ {
-				r.a[i].Index = t.Indexes[i]
-			}
-		}
-	}
-	return
-}
-
-func (t Result) parseArrayMapValues(i int, json string, valueize bool, value Result, r *arrayOrMapResult) {
-	var key Result
-	var count int
 	for ; i < len(json); i++ {
 		if json[i] <= ' ' {
 			continue
@@ -454,15 +474,22 @@ func (t Result) parseArrayMapValues(i int, json string, valueize bool, value Res
 			if valueize {
 				r.ai = append(r.ai, value.Value())
 			} else {
-				if value.IsArray() {
-					r.a = append(r.a, value.Array()...)
-				} else {
-					r.a = append(r.a, value)
-				}
+				r.a = append(r.a, value)
 			}
 		}
 	}
-
+end:
+	if t.Indexes != nil {
+		if len(t.Indexes) != len(r.a) {
+			for i := 0; i < len(r.a); i++ {
+				r.a[i].Index = 0
+			}
+		} else {
+			for i := 0; i < len(r.a); i++ {
+				r.a[i].Index = t.Indexes[i]
+			}
+		}
+	}
 	return
 }
 

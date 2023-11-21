@@ -251,6 +251,18 @@ func (t Result) IsArray() bool {
 	return t.Type == JSON && len(t.Raw) > 0 && t.Raw[0] == '['
 }
 
+// IsParsableArray returns true if the result value is a JSON array
+// and if it CAN be parsed into values, or this is final result
+func (t Result) IsParsableArray() bool {
+	return t.Type == JSON && len(t.Raw) > 0 && t.Raw[0] == '[' && len(t.Indexes) != 0
+}
+
+// IsUnparsableArray returns true if the result value is a JSON array
+// and if CANNOT be parsed into values and this is final result
+func (t Result) IsUnparsableArray() bool {
+	return t.Type == JSON && len(t.Raw) > 0 && t.Raw[0] == '[' && len(t.Indexes) == 0
+}
+
 // IsBool returns true if the result value is a JSON boolean.
 func (t Result) IsBool() bool {
 	return t.Type == True || t.Type == False

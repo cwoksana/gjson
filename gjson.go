@@ -200,7 +200,45 @@ func (t Result) Array() []Result {
 		return []Result{t}
 	}
 	r := t.arrayOrMap('[', false)
+
+	if len(r.a) != len(t.Indexes) && len(t.Indexes) != 0 {
+		var all []Result
+
+		all = parseNestedArray(r.a, t.Indexes)
+		if len(all) == len(t.Indexes) {
+			for i := range t.Indexes {
+				all[i].Index = t.Indexes[i]
+			}
+
+			return all
+		}
+	}
+
 	return r.a
+}
+
+func parseNestedArray(results []Result, indexes []int) (all []Result) {
+	if len(results) != len(indexes) {
+		var nested []Result
+
+		for _, res := range results {
+			if !res.IsArray() {
+				all = append(all, res)
+				continue
+			}
+
+			parsed := res.arrayOrMap('[', false)
+			nested = append(nested, parsed.a...)
+		}
+
+		if len(nested) != len(indexes) {
+			return parseNestedArray(nested, indexes)
+		}
+
+		all = append(all, nested...)
+	}
+
+	return all
 }
 
 // IsObject returns true if the result value is a JSON object.
@@ -211,6 +249,12 @@ func (t Result) IsObject() bool {
 // IsArray returns true if the result value is a JSON array.
 func (t Result) IsArray() bool {
 	return t.Type == JSON && len(t.Raw) > 0 && t.Raw[0] == '['
+}
+
+// IsParsableArray returns true if the result value is a JSON array
+// and if it CAN be parsed into values, or this is final result
+func (t Result) IsParsableArray() bool {
+	return t.Type == JSON && len(t.Raw) > 0 && t.Raw[0] == '[' && len(t.Indexes) != 0
 }
 
 // IsBool returns true if the result value is a JSON boolean.
@@ -1645,7 +1689,13 @@ func parseArray(c *parseContext, i int, path string) (int, bool) {
 											raw = res.String()
 										}
 										jsons = append(jsons, []byte(raw)...)
-										indexes = append(indexes, res.Index)
+
+										if res.Index != 0 {
+											indexes = append(indexes, res.Index)
+										} else if len(res.Indexes) > 0 {
+											indexes = append(indexes, res.Indexes...)
+										}
+
 										k++
 									}
 								}
